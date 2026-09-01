@@ -6,7 +6,12 @@ import type Lenis from "lenis";
 export default function SmoothScroll({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let lenisInstance: Lenis | null = null;
-    let rafId: number;
+    let rafId: number | undefined;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let gsapTickerFn: ((time: number) => void) | null = null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let gsapRef: any = null;
+    let anchorCleanup: (() => void) | null = null;
 
     const initLenis = async () => {
       try {
@@ -28,17 +33,20 @@ export default function SmoothScroll({ children }: { children: React.ReactNode }
           const { default: gsap } = await import("gsap");
           const { ScrollTrigger } = await import("gsap/ScrollTrigger");
           if (gsap && ScrollTrigger) {
+            gsapRef = gsap;
             gsap.registerPlugin(ScrollTrigger);
             lenisInstance.on("scroll", () => {
               ScrollTrigger.update();
             });
-            gsap.ticker.add((time: number) => {
+            // Store the ticker fn so we can remove it on cleanup
+            gsapTickerFn = (time: number) => {
               lenisInstance?.raf(time * 1000);
-            });
+            };
+            gsap.ticker.add(gsapTickerFn);
             gsap.ticker.lagSmoothing(0);
           }
         } catch {
-          // Standard RAF fallback
+          // Standard RAF fallback when GSAP is unavailable
           function raf(time: number) {
             lenisInstance?.raf(time);
             rafId = requestAnimationFrame(raf);
@@ -62,10 +70,8 @@ export default function SmoothScroll({ children }: { children: React.ReactNode }
         };
 
         document.addEventListener("click", handleAnchorClick);
-
-        return () => {
-          document.removeEventListener("click", handleAnchorClick);
-        };
+        // Store cleanup so it is accessible from the outer cleanup fn
+        anchorCleanup = () => document.removeEventListener("click", handleAnchorClick);
       } catch (err) {
         console.warn("Lenis init notice:", err);
       }
@@ -74,7 +80,13 @@ export default function SmoothScroll({ children }: { children: React.ReactNode }
     initLenis();
 
     return () => {
-      if (rafId) cancelAnimationFrame(rafId);
+      // Remove RAF loop if used
+      if (rafId !== undefined) cancelAnimationFrame(rafId);
+      // Remove GSAP ticker fn to prevent memory leak
+      if (gsapRef && gsapTickerFn) gsapRef.ticker.remove(gsapTickerFn);
+      // Remove anchor click listener
+      if (anchorCleanup) anchorCleanup();
+      // Destroy Lenis instance
       lenisInstance?.destroy();
     };
   }, []);

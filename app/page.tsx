@@ -188,7 +188,7 @@ export default function Home() {
         <div className="about-header">
           <div>
             <Reveal y={20}>
-              <h1 className="about-kicker">About Craft House</h1>
+              <p className="about-kicker">About Craft House</p>
             </Reveal>
             <Reveal delay={0.08} y={30}>
               <h2>

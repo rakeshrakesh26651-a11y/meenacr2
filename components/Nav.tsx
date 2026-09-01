@@ -11,7 +11,7 @@ export default function Nav() {
   const links = [
     ["Projects", "#projects"],
     ["About us", "#about"],
-    ["Blog", "#blog"],
+    ["Process", "#process"],
     ["Contact", "#contact"]
   ];
 
